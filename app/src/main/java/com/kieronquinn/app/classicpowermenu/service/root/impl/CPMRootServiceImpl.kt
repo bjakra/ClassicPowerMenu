@@ -34,49 +34,56 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import rikka.shizuku.SystemServiceHelper
 import java.io.File
 
 @SuppressLint("RestrictedApi", "BlockedPrivateApi")
-class CPMRootServiceImpl: IClassicPowerMenu.Stub() {
+/**
+ *  Graphite: runs inside the platform-signed app, which holds these permissions itself. Only the
+ *  two loyalty card calls need access to another app's files, so they go to [rootLoyalty], which
+ *  is the same class bound as a root service when the device has root.
+ */
+class CPMRootServiceImpl(
+    private val appContext: Context? = null,
+    private val rootLoyalty: () -> IClassicPowerMenu? = { null }
+): IClassicPowerMenu.Stub() {
 
     private val activityManager by lazy {
-        val activityManagerProxy = SystemServiceHelper.getSystemService("activity")
+        val activityManagerProxy = getSystemServiceBinder("activity")
         IActivityManager.Stub.asInterface(activityManagerProxy)
     }
 
     private val inputManager by lazy {
-        val inputManagerProxy = SystemServiceHelper.getSystemService("input")
+        val inputManagerProxy = getSystemServiceBinder("input")
         IInputManager.Stub.asInterface(inputManagerProxy)
     }
 
     private val lockSettings by lazy {
-        val lockSettingsProxy = SystemServiceHelper.getSystemService("lock_settings")
+        val lockSettingsProxy = getSystemServiceBinder("lock_settings")
         ILockSettings.Stub.asInterface(lockSettingsProxy)
     }
 
     private val windowManager by lazy {
-        val windowManagerProxy = SystemServiceHelper.getSystemService("window")
+        val windowManagerProxy = getSystemServiceBinder("window")
         IWindowManager.Stub.asInterface(windowManagerProxy)
     }
 
     private val userManager by lazy {
-        val userManagerProxy = SystemServiceHelper.getSystemService("user")
+        val userManagerProxy = getSystemServiceBinder("user")
         IUserManager.Stub.asInterface(userManagerProxy)
     }
 
     private val trustManager by lazy {
-        val trustManagerProxy = SystemServiceHelper.getSystemService("trust")
+        val trustManagerProxy = getSystemServiceBinder("trust")
         ITrustManager.Stub.asInterface(trustManagerProxy)
     }
 
     private val powerManager by lazy {
-        val powerManagerProxy = SystemServiceHelper.getSystemService("power")
+        val powerManagerProxy = getSystemServiceBinder("power")
         IPowerManager.Stub.asInterface(powerManagerProxy)
     }
 
     private val context by lazy {
-        Utils.getContext().createPackageContext(BuildConfig.APPLICATION_ID, Context.CONTEXT_IGNORE_SECURITY or Context.CONTEXT_INCLUDE_CODE)
+        (appContext ?: Utils.getContext()).createPackageContext(BuildConfig.APPLICATION_ID, Context.CONTEXT_IGNORE_SECURITY or Context.CONTEXT_INCLUDE_CODE)
     }
 
     override fun bindServicePrivileged(bindContainer: ServiceBindContainer, intent: Intent, flags: Int): Int {
@@ -141,7 +148,8 @@ class CPMRootServiceImpl: IClassicPowerMenu.Stub() {
     }
 
     override fun restartSystemUi() {
-        Runtime.getRuntime().exec("pkill systemui")
+        ActivityManager::class.java.getMethod("forceStopPackage", String::class.java)
+            .invoke(context.getSystemService(ActivityManager::class.java), "com.android.systemui")
     }
 
     override fun takeScreenshot() {
@@ -164,6 +172,7 @@ class CPMRootServiceImpl: IClassicPowerMenu.Stub() {
     }
 
     override fun getGooglePayDatabaseForLoyalty(): ParcelFileDescriptor? {
+        if(appContext != null) return rootLoyalty()?.googlePayDatabaseForLoyalty
         try {
             val googlePayContext = getGooglePayContext()
             val googlePayAccountId = getGooglePayCurrentAccountId(googlePayContext)
@@ -185,6 +194,7 @@ class CPMRootServiceImpl: IClassicPowerMenu.Stub() {
     }
 
     override fun getGooglePayLoyaltyImageForId(id: String): ParcelFileDescriptor? {
+        if(appContext != null) return rootLoyalty()?.getGooglePayLoyaltyImageForId(id)
         try {
             val googlePayContext = getGooglePayContext()
             val googlePayAccountId = getGooglePayCurrentAccountId(googlePayContext)
@@ -266,28 +276,9 @@ class CPMRootServiceImpl: IClassicPowerMenu.Stub() {
         activityManager.resumeAppSwitches()
     }
 
-    private fun grantNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Runtime.getRuntime().exec("pm grant ${BuildConfig.APPLICATION_ID} ${Manifest.permission.POST_NOTIFICATIONS}")
-        }
-    }
-
-    private fun grantAccessibilityPermission() {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Runtime.getRuntime().exec("appops set ${BuildConfig.APPLICATION_ID} ACCESS_RESTRICTED_SETTINGS allow")
-        }
-    }
-
-    private fun grantSecureSettingsPermission() {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Runtime.getRuntime().exec("pm grant ${BuildConfig.APPLICATION_ID} ${Manifest.permission.WRITE_SECURE_SETTINGS}")
-        }
-    }
-
-    init {
-        grantNotificationPermission()
-        grantAccessibilityPermission()
-        grantSecureSettingsPermission()
+    private fun getSystemServiceBinder(name: String): IBinder {
+        return Class.forName("android.os.ServiceManager")
+            .getMethod("getService", String::class.java).invoke(null, name) as IBinder
     }
 
 }

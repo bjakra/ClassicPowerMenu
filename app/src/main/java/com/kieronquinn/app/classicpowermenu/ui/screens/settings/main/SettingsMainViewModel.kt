@@ -7,7 +7,6 @@ import android.os.Build
 import android.os.Bundle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
 import com.jakewharton.processphoenix.ProcessPhoenix
 import com.kieronquinn.app.classicpowermenu.BuildConfig
 import com.kieronquinn.app.classicpowermenu.components.navigation.AppNavigation
@@ -20,6 +19,8 @@ import com.kieronquinn.app.classicpowermenu.utils.extensions.getSecureSettingAsS
 import com.kieronquinn.app.classicpowermenu.utils.extensions.isAccessibilityServiceEnabled
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
+private const val SECURE_ENABLED = "graphite_classic_power_menu"
 
 abstract class SettingsMainViewModel: ViewModel() {
 
@@ -49,10 +50,15 @@ abstract class SettingsMainViewModel: ViewModel() {
 
 }
 
-class SettingsMainViewModelImpl(context: Context, private val settings: Settings, private val navigation: AppNavigation): SettingsMainViewModel() {
+class SettingsMainViewModelImpl(private val context: Context, private val settings: Settings, private val navigation: AppNavigation): SettingsMainViewModel() {
 
     override val enabled = settings.enabledFlow
     override val enabledInitialState = settings.enabled
+    init {
+        settings.enabled = android.provider.Settings.Secure.getInt(
+            context.contentResolver, SECURE_ENABLED, 1
+        ) != 0
+    }
     override var useMonet by settings::useMonet
     override var useSolidColor by settings::useSolidBackground
     override val developerOptionsEnabled = settings.developerOptionsEnabledFlow
@@ -63,8 +69,8 @@ class SettingsMainViewModelImpl(context: Context, private val settings: Settings
     override var accessibilityServiceDisabled = false
     private val isAccessibilityServiceDisabled = context.getSecureSettingAsStringFlow(android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     override val accessibilityServiceDisabledFlow = combine(isAccessibilityServiceDisabled, resumeBus){ _, _ ->
-        if(XposedSelfHook().isXposedHooked()) return@combine false
-        !isAccessibilityServiceEnabled(context, CPMAccessibilityService::class.java)
+        // Graphite: SystemUI opens the menu directly, no accessibility service needed
+        false
     }.apply {
         viewModelScope.launch {
             collect {
@@ -85,7 +91,8 @@ class SettingsMainViewModelImpl(context: Context, private val settings: Settings
     }
 
     private val openSourceLibrariesIntent by lazy {
-        Intent(context, OssLicensesMenuActivity::class.java)
+        // Graphite: Google's licence screen is gone, the project page lists the libraries
+        Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/bjakra/ClassicPowerMenu"))
     }
 
     override fun onAccessibilityWarningClicked() {
@@ -101,6 +108,10 @@ class SettingsMainViewModelImpl(context: Context, private val settings: Settings
     override fun onMainSwitchClicked() {
         viewModelScope.launch {
             settings.enabled = !settings.enabled
+            // Graphite: SystemUI reads this, and Graphite's own power menu page changes it too
+            android.provider.Settings.Secure.putInt(
+                context.contentResolver, SECURE_ENABLED, if(settings.enabled) 1 else 0
+            )
         }
     }
 

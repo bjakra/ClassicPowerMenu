@@ -26,16 +26,7 @@ class MainActivityViewModelImpl(context: Context, private val updateChecker: Upd
 
     private val decisionMade = MutableSharedFlow<Unit>()
 
-    private val _update = MutableStateFlow<UpdateChecker.Update?>(null).apply {
-        viewModelScope.launch {
-            withContext(Dispatchers.IO){
-                updateChecker.clearCachedDownloads(context)
-            }
-            updateChecker.getLatestRelease().collect {
-                emit(it)
-            }
-        }
-    }
+    private val _update = MutableStateFlow<UpdateChecker.Update?>(null)  // Graphite: the ROM delivers updates
 
     private val splashDelay = flow {
         delay(1000)

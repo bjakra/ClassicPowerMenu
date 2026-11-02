@@ -2,11 +2,14 @@ package com.kieronquinn.app.classicpowermenu.ui.activities
 
 import android.app.KeyguardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.os.ResultReceiver
 import android.transition.Fade
 import android.view.Window
 import android.view.WindowManager
+import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -24,6 +27,8 @@ import com.kieronquinn.monetcompat.app.MonetCompatActivity
 import kotlinx.coroutines.flow.collect
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+
+private const val EXTRA_ACK = "org.graphite.extra.POWER_MENU_ACK"
 
 class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStarterEventListener {
 
@@ -55,6 +60,20 @@ class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStart
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    /**
+     *  Graphite: SystemUI shows its own power menu unless this arrives
+     */
+    private fun acknowledgeToSystemUi() {
+        val ack = IntentCompat.getParcelableExtra(intent, EXTRA_ACK, ResultReceiver::class.java)
+        intent.removeExtra(EXTRA_ACK)
+        ack?.send(0, null)
+    }
+
     private fun hideStatusBar(){
         WindowInsetsControllerCompat(window, window.decorView).run {
             hide(WindowInsetsCompat.Type.statusBars())
@@ -71,6 +90,7 @@ class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStart
 
     override fun onResume() {
         super.onResume()
+        acknowledgeToSystemUi()
         starter.setEventListener(this)
         whenResumed {
             window.decorView.awaitPost()

@@ -51,7 +51,7 @@ class SettingsImpl(context: Context): Settings() {
     companion object {
 
         private const val KEY_HAS_SEEN_SETUP = "has_seen_setup"
-        private const val DEFAULT_HAS_SEEN_SETUP = false
+        private const val DEFAULT_HAS_SEEN_SETUP = true
 
         private const val KEY_ENABLED = "enabled"
         private const val DEFAULT_ENABLED = true

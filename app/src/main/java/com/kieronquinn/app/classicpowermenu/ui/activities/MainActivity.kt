@@ -22,7 +22,6 @@ import com.kieronquinn.app.classicpowermenu.utils.TransitionUtils
 import com.kieronquinn.app.classicpowermenu.utils.extensions.broadcastReceiverAsFlow
 import com.kieronquinn.app.classicpowermenu.utils.extensions.delayPreDrawUntilFlow
 import com.kieronquinn.app.classicpowermenu.utils.extensions.whenCreated
-import com.kieronquinn.app.classicpowermenu.workers.UpdateCheckWorker
 import com.kieronquinn.monetcompat.app.MonetCompatActivity
 import kotlinx.coroutines.flow.collect
 import org.koin.android.ext.android.inject
@@ -42,7 +41,6 @@ class MainActivity : MonetCompatActivity() {
         setupBringToFront()
         setupInsets()
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        UpdateCheckWorker.queueCheckWorker(this)
         whenCreated {
             monet.awaitMonetReady()
             window.setBackgroundDrawable(ColorDrawable(monet.getBackgroundColor(this@MainActivity)))

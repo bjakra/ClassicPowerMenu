@@ -4,14 +4,13 @@ plugins {
     id 'androidx.navigation.safeargs'
     id 'com.google.protobuf'
     id 'kotlin-parcelize'
-    id 'com.google.android.gms.oss-licenses-plugin'
     id 'com.google.devtools.ksp'
 }
 
 def version = '1.9.3'
 
 android {
-    compileSdkVersion 36
+    compileSdkVersion 37
 
     defaultConfig {
         applicationId "com.kieronquinn.app.classicpowermenu"
@@ -38,14 +37,14 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
     namespace 'com.kieronquinn.app.classicpowermenu'
 }
 
 kotlin {
-    jvmToolchain(11)
+    jvmToolchain(21)
 }
 
 protobuf {
@@ -142,7 +141,6 @@ dependencies {
     compileOnly 'de.robv.android.xposed:api:82'
 
     //OSS libraries activity
-    implementation 'com.google.android.gms:play-services-oss-licenses:17.5.0'
 
     //Retrofit for update checking
     implementation 'com.squareup.retrofit2:retrofit:3.0.0'
