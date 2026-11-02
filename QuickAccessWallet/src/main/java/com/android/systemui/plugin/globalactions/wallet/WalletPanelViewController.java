@@ -74,6 +74,34 @@ public class WalletPanelViewController implements
     private final QuickAccessWalletClient mWalletClient;
     private final WalletView mWalletView;
     private final WalletCardCarousel mWalletCardCarousel;
+    /**
+     * Graphite: the last cards per lock state, kept in memory only, never on disk. Wallets can show
+     * different card art while locked, so a locked menu never reuses cards from unlocked.
+     */
+    private static final CachedCards[] sCachedCards = new CachedCards[2];
+    private String mShownSignature;
+
+    private static final class CachedCards {
+        final String mSignature;
+        final List<WalletCardViewInfo> mData;
+        final GetWalletCardsResponse mResponse;
+
+        CachedCards(String signature, List<WalletCardViewInfo> data,
+                GetWalletCardsResponse response) {
+            mSignature = signature;
+            mData = data;
+            mResponse = response;
+        }
+    }
+
+    private static String cardsSignature(List<WalletCardViewInfo> data, int selectedIndex) {
+        StringBuilder signature = new StringBuilder().append(selectedIndex);
+        for (WalletCardViewInfo card : data) {
+            signature.append('|').append(card.getCardId()).append('/').append(card.getText());
+        }
+        return signature.toString();
+    }
+
     private final GlobalActionsPanelPlugin.Callbacks mPluginCallbacks;
     private final ExecutorService mExecutor;
     private final Handler mHandler;
@@ -180,6 +208,12 @@ public class WalletPanelViewController implements
         }
         mWalletView.show();
         mWalletView.hideErrorMessage();
+        // Graphite: show the last known cards straight away, then only redraw if they changed
+        CachedCards cached = sCachedCards[mIsDeviceLocked ? 1 : 0];
+        if (cached != null) {
+            mShownSignature = cached.mSignature;
+            setupWalletView(cached.mData, cached.mResponse);
+        }
         int cardWidthPx = mWalletCardCarousel.getCardWidthPx();
         int cardHeightPx = mWalletCardCarousel.getCardHeightPx();
         int iconSizePx = mWalletView.getIconSizePx();
@@ -218,7 +252,20 @@ public class WalletPanelViewController implements
         }
 
         mWalletLoyaltyCardCallback.getMethod().invoke(data, () -> {
-            if(data.isEmpty()) return;
+            final String signature = cardsSignature(data, response.getSelectedIndex());
+            final int slot = mIsDeviceLocked ? 1 : 0;
+            if(data.isEmpty()) {
+                sCachedCards[slot] = null;
+                // Graphite: a cached card was removed
+                if(mShownSignature != null) {
+                    mShownSignature = null;
+                    setupWalletView(data, response);
+                }
+                return;
+            }
+            sCachedCards[slot] = new CachedCards(signature, data, response);
+            if(signature.equals(mShownSignature)) return;
+            mShownSignature = signature;
             //Make sure we're still attached
             if(mWalletView.isAttachedToWindow()) {
                 setupWalletView(data, response);
@@ -251,6 +298,10 @@ public class WalletPanelViewController implements
     public void onWalletCardRetrievalError(GetWalletCardsError error) {
         mWalletView.post(() -> {
             if (mIsDismissed) {
+                return;
+            }
+            // Graphite: keep showing the cached cards if the wallet can't answer right now
+            if (mShownSignature != null) {
                 return;
             }
             mWalletView.showErrorMessage(error.getMessage());

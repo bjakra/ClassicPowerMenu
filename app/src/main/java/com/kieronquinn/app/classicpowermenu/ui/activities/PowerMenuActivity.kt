@@ -1,5 +1,6 @@
 package com.kieronquinn.app.classicpowermenu.ui.activities
 
+import android.animation.ValueAnimator
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
@@ -8,6 +9,7 @@ import android.os.Bundle
 import android.os.ResultReceiver
 import android.transition.Fade
 import android.view.Window
+import android.view.animation.DecelerateInterpolator
 import android.view.WindowManager
 import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
@@ -28,6 +30,8 @@ import kotlinx.coroutines.flow.collect
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 
+private const val ENTER_DURATION_MS = 260L
+private const val ENTER_START_SCALE = 0.96f
 private const val EXTRA_ACK = "org.graphite.extra.POWER_MENU_ACK"
 
 class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStarterEventListener {
@@ -37,6 +41,7 @@ class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStart
     private val viewModel by viewModel<PowerMenuActivityViewModel>()
     private val serviceContainer by inject<CPMServiceContainer>()
     private val starter by inject<PowerMenuStarter>()
+    private var hasAnimatedIn = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         window.requestFeature(Window.FEATURE_CONTENT_TRANSITIONS)
@@ -48,6 +53,8 @@ class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStart
         setTurnScreenOn(true)
         super.onCreate(savedInstanceState)
         requestedOrientation = viewModel.getRequestedOrientation()
+        // Graphite: hidden until the first frame is ready, then animated in
+        if(savedInstanceState == null) window.decorView.alpha = 0f
         hideStatusBar()
         whenCreated {
             setContentView(R.layout.activity_power_menu)
@@ -94,9 +101,31 @@ class PowerMenuActivity : MonetCompatActivity(), PowerMenuStarter.PowerMenuStart
         starter.setEventListener(this)
         whenResumed {
             window.decorView.awaitPost()
-            if(!viewModel.useSolidBackground){
-                blurProvider.applyBlurToWindow(window, 1.5f)
+            animateIn()
+        }
+    }
+
+    /**
+     *  Graphite: fades, scales and blurs in together, matching the fade out. The animation scale
+     *  setting is respected, because ValueAnimator follows it.
+     */
+    private fun animateIn() {
+        if(hasAnimatedIn) return
+        hasAnimatedIn = true
+        val decor = window.decorView
+        val useBlur = !viewModel.useSolidBackground
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = ENTER_DURATION_MS
+            interpolator = DecelerateInterpolator(1.5f)
+            addUpdateListener {
+                val progress = it.animatedValue as Float
+                decor.alpha = progress
+                val scale = ENTER_START_SCALE + (1f - ENTER_START_SCALE) * progress
+                decor.scaleX = scale
+                decor.scaleY = scale
+                if(useBlur) blurProvider.applyBlurToWindow(window, 1.5f * progress)
             }
+            start()
         }
     }
 

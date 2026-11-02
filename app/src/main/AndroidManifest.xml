@@ -75,6 +75,10 @@
         </activity>
 
         <!-- INTERACT_ACROSS_USERS_FULL requires a signature privilege app w/ the permission, like SystemUI, to bind -->
+        <service android:name=".service.GraphiteWarmService"
+            android:exported="true"
+            android:permission="android.permission.STATUS_BAR_SERVICE" />
+
         <service android:name=".service.globalactions.GlobalActionsService"
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
