@@ -2,6 +2,8 @@ package com.kieronquinn.app.classicpowermenu.components.quickaccesswallet
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.role.RoleManager
+import android.provider.Settings
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -30,11 +32,18 @@ object CPMQuickAccessWalletServiceInfoBuilder {
         }.newInstance(serviceInfo, metadata)
     }
 
-    private fun getDefaultPaymentApp(context: Context): ComponentName? {
-        val cr = context.contentResolver
-        val comp =
-            "com.google.android.gms/com.google.android.gms.tapandpay.hce.service.TpHceService" //TODO re-hook up Settings.Secure.getString(cr, "nfc_payment_default_component");
-        return if (comp == null) null else ComponentName.unflattenFromString(comp)
+    /**
+     *  Graphite: upstream hard-codes Google's service. This uses the wallet the user has chosen: the
+     *  default contactless payment app, then the holder of the wallet role.
+     */
+    @JvmStatic
+    fun getDefaultPaymentApp(context: Context): ComponentName? {
+        val comp = Settings.Secure.getString(context.contentResolver, "nfc_payment_default_component")
+        comp?.let { ComponentName.unflattenFromString(it) }?.let { return it }
+        val holders = RoleManager::class.java.getMethod("getRoleHolders", String::class.java)
+            .invoke(context.getSystemService(RoleManager::class.java), "android.app.role.WALLET") as List<*>
+        val holder = holders.firstOrNull() as? String ?: return null
+        return ComponentName(holder, "")
     }
 
     private fun getWalletServiceInfo(context: Context, packageName: String): ServiceInfo? {

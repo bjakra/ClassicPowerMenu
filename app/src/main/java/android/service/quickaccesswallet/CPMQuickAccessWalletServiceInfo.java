@@ -86,11 +86,8 @@ class CPMQuickAccessWalletServiceInfo {
     }
 
     private static ComponentName getDefaultPaymentApp(Context context) {
-        return new ComponentName("com.google.android.gms", "com.google.android.gms.tapandpay.hce.service.TpHceService");
-        //TODO re-setup
-        /*ContentResolver cr = context.getContentResolver();
-        String comp = Settings.Secure.getString(cr, Settings.Secure.NFC_PAYMENT_DEFAULT_COMPONENT);
-        return comp == null ? null : ComponentName.unflattenFromString(comp);*/
+        return com.kieronquinn.app.classicpowermenu.components.quickaccesswallet
+                .CPMQuickAccessWalletServiceInfoBuilder.getDefaultPaymentApp(context);
     }
 
     private static ServiceInfo getWalletServiceInfo(Context context, String packageName) {
